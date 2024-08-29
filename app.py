@@ -38,7 +38,6 @@ municipality_names = [
 ]
 
 if analysis_type == "Alle kommuner":
-    # Existing code for all municipalities
     available_quarters = get_available_quarters(4)  # Last 4 quarters
     selected_quarters = available_quarters[-2:]  # Last 2 quarters
 
@@ -66,42 +65,65 @@ if analysis_type == "Alle kommuner":
 
         # Get municipality labels
         municipality_labels = data["dimension"]["Region"]["category"]["label"]
-        
+
         # Create DataFrame
         df = pd.DataFrame(data["value"], columns=["Folketall"])
         df["Kommune"] = [municipality_labels[code] for code in municipality_codes for _ in selected_quarters]
         df["Kvartal"] = selected_quarters * len(municipality_codes)
-        
+
         # Pivot the DataFrame for easier change calculation
         df_pivot = df.pivot(index="Kommune", columns="Kvartal", values="Folketall")
-        
+
         # Calculate change
         df_pivot["Endring"] = df_pivot[selected_quarters[-1]] - df_pivot[selected_quarters[-2]]
         df_pivot["Endring %"] = (df_pivot["Endring"] / df_pivot[selected_quarters[-2]] * 100).round(2)
-        
+
         # Reset index to make Kommune a column again
         df_final = df_pivot.reset_index()
-        
+
         # Rename columns for clarity
         df_final = df_final.rename(columns={selected_quarters[-1]: "Folketall"})
-        
+
         # Sort by population
-        df_final = df_final.sort_values("Folketall", ascending=False)
+        df_final_pop = df_final.sort_values("Folketall", ascending=False)
+
+        # Display table for municipalities sorted by population
+        st.write(f"Data for kommuner i Rogaland, kvartal {selected_quarters[-1]} (sortert etter folketall)")
         
-        # Display table for municipalities
-        st.write(f"Data for kommuner i Rogaland, kvartal {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
-        st.table(df_final[["Kommune", "Folketall", "Endring", "Endring %"]])
+        # Function to color negative values red
+        def color_negative_red(val):
+            color = 'red' if val < 0 else 'black'
+            return f'color: {color}'
+
+        # Apply the color function to the "Endring" and "Endring %" columns
+        styled_df_pop = df_final_pop.style.applymap(color_negative_red, subset=['Endring', 'Endring %'])
         
-        # Create bar plot for population
-        fig_pop = px.bar(df_final, x="Kommune", y="Folketall", 
-                         title="Befolkning i Rogaland kommuner")
+        st.table(styled_df_pop)
+
+        # Create bar plot for population (blue bars)
+        fig_pop = px.bar(df_final_pop, x="Kommune", y="Folketall", 
+                         title="Befolkning i Rogaland kommuner",
+                         color_discrete_sequence=['blue'])
+        fig_pop.update_layout(xaxis_tickangle=-45)
         st.plotly_chart(fig_pop)
-        
-        # Create bar plot for change
-        fig_change = px.bar(df_final, x="Kommune", y="Endring", 
-                            title="Befolkningsendring i Rogaland kommuner")
+
+        # Sort by change
+        df_final_change = df_final.sort_values("Endring", ascending=False)
+
+        # Display table for municipalities sorted by change
+        st.write(f"Data for kommuner i Rogaland, kvartal {selected_quarters[-1]} (sortert etter endring)")
+        styled_df_change = df_final_change.style.applymap(color_negative_red, subset=['Endring', 'Endring %'])
+        st.table(styled_df_change)
+
+        # Create bar plot for change with color coding (blue for positive, red for negative)
+        df_final_change['Color'] = df_final_change['Endring'].apply(lambda x: 'blue' if x >= 0 else 'red')
+        fig_change = px.bar(df_final_change, x="Kommune", y="Endring", 
+                            title="Befolkningsendring i Rogaland kommuner",
+                            color='Color',
+                            color_discrete_map={'blue': 'blue', 'red': 'red'})
+        fig_change.update_layout(xaxis_tickangle=-45, showlegend=False)
         st.plotly_chart(fig_change)
-        
+
         # Calculate summary for Rogaland
         rogaland_summary = pd.DataFrame({
             "Kommune": ["Rogaland totalt"],
@@ -109,14 +131,14 @@ if analysis_type == "Alle kommuner":
             "Endring": [df_final["Endring"].sum()],
             "Endring %": [(df_final["Endring"].sum() / df_final[selected_quarters[-2]].sum() * 100).round(2)]
         })
-        
+
         # Display summary table for Rogaland
-        st.write(f"Oppsummering for hele Rogaland, {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
-        st.table(rogaland_summary)
-        
+        st.write(f"Oppsummering for hele Rogaland, kvartal {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
+        st.table(rogaland_summary.style.applymap(color_negative_red, subset=['Endring', 'Endring %']))
+
         # Combine municipal data and Rogaland summary for download
-        df_download = pd.concat([df_final, rogaland_summary])
-        
+        df_download = pd.concat([df_final_pop, rogaland_summary])
+
         # Download button
         csv = df_download.to_csv(index=False)
         st.download_button(

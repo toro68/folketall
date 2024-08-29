@@ -186,7 +186,7 @@ else:  # Single municipality analysis
         })
 
         # Calculate change
-        df["Endring"] = df["Folketall"].diff()
+        df["Endring"] = df["Folketall"].diff().fillna(0).astype(int)  # Convert to integer
         df["Endring %"] = (df["Endring"] / df["Folketall"].shift(1) * 100).round(2)
 
         # Display line chart

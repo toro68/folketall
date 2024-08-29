@@ -89,7 +89,7 @@ if analysis_type == "Alle kommuner":
         df_final = df_final.sort_values("Folketall", ascending=False)
         
         # Display table for municipalities
-        st.write(f"Data for kommuner i Rogaland, {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
+        st.write(f"Data for kommuner i Rogaland, kvartal {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
         st.table(df_final[["Kommune", "Folketall", "Endring", "Endring %"]])
         
         # Create bar plot for population

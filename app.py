@@ -19,7 +19,7 @@ def get_available_quarters(num_quarters=20):
     return quarters[::-1]  # Reverse to get most recent first
 
 # Streamlit app
-st.title("SSB Folketall for Rogaland")
+st.title("SSB Folketall i Rogaland")
 
 # Sidebar for navigation
 analysis_type = st.sidebar.radio("Velg analyse", ["Alle kommuner", "Enkelt kommune over tid"])
@@ -36,11 +36,6 @@ municipality_names = [
     "Klepp", "Time", "Gjesdal", "Sola", "Randaberg", "Strand", "Hjelmeland", "Suldal",
     "Sauda", "Kvitsøy", "Bokn", "Tysvær", "Karmøy", "Utsira", "Vindafjord"
 ]
-
-# Sorter kommunene alfabetisk, men behold Stavanger først
-sorted_indices = sorted(range(1, len(municipality_names)), key=lambda k: municipality_names[k])
-municipality_names = [municipality_names[0]] + [municipality_names[i] for i in sorted_indices]
-municipality_codes = [municipality_codes[0]] + [municipality_codes[i] for i in sorted_indices]
 
 if analysis_type == "Alle kommuner":
     # Existing code for all municipalities
@@ -94,7 +89,7 @@ if analysis_type == "Alle kommuner":
         df_final = df_final.sort_values("Folketall", ascending=False)
         
         # Display table for municipalities
-        st.write(f"Data for kommuner i Rogaland - kvartal {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
+        st.write(f"Data for kommuner i Rogaland, {selected_quarters[-1]} (endring fra {selected_quarters[-2]})")
         st.table(df_final[["Kommune", "Folketall", "Endring", "Endring %"]])
         
         # Create bar plot for population
@@ -142,26 +137,26 @@ if analysis_type == "Alle kommuner":
 
 else:  # Single municipality analysis
     st.header("Analyse av enkelt kommune over tid")
-    
+
     # Select municipality
     selected_municipality = st.selectbox("Velg kommune", municipality_names)
     selected_code = municipality_codes[municipality_names.index(selected_municipality)]
-    
+
     # Select time range
     available_quarters = get_available_quarters(20)  # Increased to 20 quarters for more historical data
     start_quarter = st.selectbox("Velg startkvartalet", available_quarters, index=len(available_quarters)-8)
     
-    # Finn indeksen til start_quarter
+    # Determine the index of the start quarter
     start_index = available_quarters.index(start_quarter)
     
-    # Lag en liste av kvartaler fra start_quarter til slutten
-    end_quarters = available_quarters[start_index:]
+    # Create a list of quarters from the start quarter to the end of available quarters
+    end_quarter_options = available_quarters[start_index:]
     
-    # Velg sluttkvartalet, med standard som det siste tilgjengelige kvartalet
-    end_quarter = st.selectbox("Velg sluttkvartalet", end_quarters, index=len(end_quarters)-1)
-    
+    # Select end quarter
+    end_quarter = st.selectbox("Velg sluttkvartalet", end_quarter_options, index=len(end_quarter_options)-1)
+
     selected_quarters = available_quarters[start_index:available_quarters.index(end_quarter)+1]
-    
+
     # Query for single municipality
     query = {
         "query": [
@@ -174,7 +169,7 @@ else:  # Single municipality analysis
         ],
         "response": {"format": "json-stat2"},
     }
-    
+
     try:
         response = requests.post(url, json=query)
         response.raise_for_status()
@@ -189,20 +184,20 @@ else:  # Single municipality analysis
             "Kvartal": selected_quarters,
             "Folketall": data["value"]
         })
-        
+
         # Calculate change
         df["Endring"] = df["Folketall"].diff()
         df["Endring %"] = (df["Endring"] / df["Folketall"].shift(1) * 100).round(2)
-        
+
         # Display line chart
         fig = px.line(df, x="Kvartal", y="Folketall", 
                       title=f"Befolkningsutvikling i {selected_municipality}")
         st.plotly_chart(fig)
-        
+
         # Display table
         st.write(f"Befolkningsdata for {selected_municipality}")
         st.table(df)
-        
+
         # Download button
         csv = df.to_csv(index=False)
         st.download_button(
